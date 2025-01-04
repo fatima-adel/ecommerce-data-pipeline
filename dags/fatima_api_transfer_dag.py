@@ -19,7 +19,7 @@ with DAG(
     dag_id="ftransfer_dag_api_to_bigquery",
     default_args=default_args,
     schedule=None,
-    start_date=datetime(2023, 10, 26, tz="UTC"),
+    start_date=datetime(2024, 4, 20),
     tags=["api", "gcs", "csv", "upload"],
 ) as ftransfer_dag_api_to_bigquery:
     
