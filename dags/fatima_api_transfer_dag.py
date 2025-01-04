@@ -46,7 +46,7 @@ def upload_to_gcs(**kwargs):
     gcs_hook = GCSHook(gcp_conn_id='google_cloud_default')  # You can specify a different connection ID if needed
     gcs_hook.upload(
         bucket_name=GCS_BUCKET,
-        object_name=GCS_OBJECT_NAME,
+        object_name=GCS_FILE_PATH,
         data=output.getvalue()
     )
 # Task to fetch API data
