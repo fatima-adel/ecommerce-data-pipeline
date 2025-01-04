@@ -20,7 +20,7 @@ with DAG(
     default_args=default_args,
     schedule=None,
     start_date=datetime(2024, 4, 20),
-    tags=["api", "gcs", "csv", "upload"],
+    tags=["fatima","api", "gcs", "csv", "upload"],
 ) as ftransfer_dag_api_to_bigquery:
     
     API_URL = "https://us-central1-ready-de-25.cloudfunctions.net/order_payments_table"
@@ -55,7 +55,6 @@ fetch_api_data = SimpleHttpOperator(
     http_conn_id='http_default',  # Connection ID for your HTTP API
     endpoint=API_URL,
     method='GET',
-    xcom_push=True,
 )
 
 # Task to upload data to GCS
