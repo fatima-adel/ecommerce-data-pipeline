@@ -34,7 +34,7 @@ with DAG(
     description="postgres_to_bigquery_transfer",
     start_date=datetime(2024, 4, 20),
     schedule_interval=None,
-    tags=["postgres", "sql", "bigquery", "transfer"],
+    tags=["fatima","postgres", "sql", "bigquery", "transfer"],
 ) as ftransfer_dag_postgres_database:
     
     for table_name in TABLES_TO_TRANSFER:

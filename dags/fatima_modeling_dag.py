@@ -9,7 +9,7 @@ with DAG(
     dag_id="fbigquery_modeling_transformation",
     schedule=None,
     start_date=pendulum.datetime(2023, 10, 26, tz="UTC"),
-    tags=["bigquery", "modeling", "transformation"],
+    tags=["fatima","bigquery", "modeling", "transformation"],
 ) as fbigquery_modeling_transformation:
     
     source_table = "`ready-de-25.landing`"
