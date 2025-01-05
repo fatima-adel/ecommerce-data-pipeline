@@ -23,8 +23,7 @@ with DAG(
     GCS_BUCKET = "ready-d25-postgres-to-gcs"
     GCS_FILE_PATH = "fatima/order_payments.csv"
     PROJECT_ID = "ready-de-25"
-    DATASET_ID = "landing"
-    TABLE_ID = "fatima_order_payments"
+
 
     def upload_to_gcs(ti, api_url, bucket, obj):
         if not (api_url and bucket and obj and re.match(r"^https?://", api_url)):
