@@ -4,6 +4,7 @@ from airflow.providers.http.operators.http import SimpleHttpOperator
 from airflow.utils.dates import days_ago
 import csv
 import io
+import json
 from google.cloud import storage
 from airflow.providers.google.cloud.transfers.gcs_to_bigquery import GCSToBigQueryOperator
 from google.cloud import storage
@@ -22,32 +23,43 @@ with DAG(
     tags=["fatima", "api", "gcs", "csv", "upload"],
     ) as ftransfer_dag_api_to_bigquery:
     
-    API_URL = "/order_payments_table"
+    API_URL = "https://us-central1-ready-de-25.cloudfunctions.net/order_payments_table"
     GCS_BUCKET = "ready-d25-postgres-to-gcs"
     GCS_FILE_PATH = "fatima/order_payments.csv"
     PROJECT_ID = "ready-de-25"
     DATASET_ID = "landing"
     TABLE_ID = "fatima_order_payments"
 
-    # Function to convert API response to CSV and upload to GCS
-    def upload_to_gcs(**kwargs):
-        # Get the API response from XCom
-        api_response = kwargs['ti'].xcom_pull(task_ids='fetch_api_data')
-        
-        # Convert the API response (list of dicts) to CSV
-        output = io.StringIO()
-        csv_writer = csv.DictWriter(output, fieldnames=api_response[0].keys())
-        csv_writer.writeheader()
-        csv_writer.writerows(api_response)
-        output.seek(0)
+def upload_to_gcs(**kwargs):
+    # Get the API response from XCom
+    api_response = kwargs['ti'].xcom_pull(task_ids='fetch_api_data')
 
-        # Upload the CSV file to GCS
-        gcs_hook = GCSHook(gcp_conn_id='google_cloud_default')  # You can specify a different connection ID if needed
-        gcs_hook.upload(
-            bucket_name=GCS_BUCKET,
-            object_name=GCS_FILE_PATH,
-            data=output.getvalue()
-        )
+    # Ensure the API response is a list of dictionaries
+    if isinstance(api_response, str):
+        try:
+            # Attempt to parse the string as JSON if it's a string
+            api_response = json.loads(api_response)
+        except json.JSONDecodeError:
+            raise ValueError("API response is a string but could not be parsed as JSON.")
+    
+    # Check that the response is a list of dictionaries
+    if not isinstance(api_response, list) or not all(isinstance(item, dict) for item in api_response):
+        raise ValueError("API response is not in the expected format (list of dictionaries).")
+    
+    # Convert the API response (list of dicts) to CSV
+    output = io.StringIO()
+    csv_writer = csv.DictWriter(output, fieldnames=api_response[0].keys())
+    csv_writer.writeheader()
+    csv_writer.writerows(api_response)
+    output.seek(0)
+
+    # Upload the CSV file to GCS
+    gcs_hook = GCSHook(gcp_conn_id='google_cloud_default')  # You can specify a different connection ID if needed
+    gcs_hook.upload(
+        bucket_name=GCS_BUCKET,
+        object_name=GCS_FILE_PATH,
+        data=output.getvalue()
+    )
 
     # Task to fetch API data
     fetch_api_data = SimpleHttpOperator(
