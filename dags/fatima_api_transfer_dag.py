@@ -6,7 +6,7 @@ import requests
 import csv
 import json
 import logging
-import os
+import os, io
 import requests
 from google.cloud import storage
 from airflow.providers.google.cloud.transfers.gcs_to_bigquery import GCSToBigQueryOperator
@@ -35,50 +35,58 @@ with DAG(
 
     def upload_to_gcs(api_url, output_filename=None):
         logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-
-        try:
-            logging.info(f"Fetching data from {api_url}")
+        
+        logging.info(f"Fetching data from {api_url}")
         response = requests.get(api_url, stream=True, timeout=10)
-        response.raise_for_status()
+        response.raise_for_status()  # Will raise an HTTPError for bad responses
 
-        os.makedirs(os.path.dirname(output_filename), exist_ok=True)
+            # Create the directory if it doesn't exist
+        if output_filename:
+                os.makedirs(os.path.dirname(output_filename), exist_ok=True)
 
+            # Process the data
         if response.headers.get('Content-Type') == 'application/json':
-            data = response.json()
-            if isinstance(data, list):
-                if data and all(isinstance(item,dict) for item in data):
-                    with open(output_filename, 'w', newline='', encoding='utf-8') as csvfile:
-                        writer = csv.DictWriter(csvfile, fieldnames=data[0].keys())
+                data = response.json()
+                # Check if the data is a list of dicts
+                if isinstance(data, list):
+                    if data and all(isinstance(item, dict) for item in data):
+                        # Writing CSV to memory
+                        output = io.StringIO()
+                        writer = csv.DictWriter(output, fieldnames=data[0].keys())
                         writer.writeheader()
                         writer.writerows(data)
-                        
-            elif isinstance(data, dict):
-                with open(output_filename, 'w', newline='', encoding='utf-8') as csvfile:
-                    writer = csv.DictWriter(csvfile, fieldnames=data.keys())
+                        csv_data = output.getvalue()
+                # If data is a dict
+                elif isinstance(data, dict):
+                    output = io.StringIO()
+                    writer = csv.DictWriter(output, fieldnames=data.keys())
                     writer.writeheader()
                     writer.writerow(data)
-
+                    csv_data = output.getvalue()
         else:
-            with open(output_filename, 'w', newline='', encoding='utf-8') as csvfile:
-                writer = csv.writer(csvfile)
-                writer.writerows(csv.reader(response.iter_lines(decode_unicode=True), delimiter=','))
+                # Handling CSV content directly from response
+                output = io.StringIO()
+                writer = csv.writer(output)
+                # Writing the lines from the response directly to the CSV
+                for line in response.iter_lines(decode_unicode=True):
+                    writer.writerow(line.split(','))
+                csv_data = output.getvalue()
 
-
-        # Upload the CSV file to GCS
-        gcs_hook = GCSHook(gcp_conn_id='google_cloud_default')  # You can specify a different connection ID if needed
+            # Upload the CSV data to GCS
+        gcs_hook = GCSHook(gcp_conn_id='google_cloud_default')  # Specify a different connection ID if needed
         gcs_hook.upload(
-            bucket_name=GCS_BUCKET,
-            object_name=GCS_FILE_PATH,
-            data=csvfile.getvalue()
-        )
+                bucket_name='GCS_BUCKET',  # Replace with your bucket name
+                object_name='GCS_FILE_PATH',    # Replace with the desired file path
+                data=csv_data
+            )
 
-    # Task to fetch API data
-    fetch_api_data = SimpleHttpOperator(
-        task_id='fetch_api_data',
-        http_conn_id='http_default',  # Connection ID for your HTTP API
-        endpoint=API_URL,
-        method='GET',
-        dag=ftransfer_dag_api_to_bigquery  # Ensure DAG is passed explicitly
+        # Task to fetch API data
+        fetch_api_data = SimpleHttpOperator(
+            task_id='fetch_api_data',
+            http_conn_id='http_default',  # Connection ID for your HTTP API
+            endpoint=API_URL,
+            method='GET',
+            dag=ftransfer_dag_api_to_bigquery  # Ensure DAG is passed explicitly
     )
 
     # Task to upload data to GCS
