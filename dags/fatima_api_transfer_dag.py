@@ -2,9 +2,12 @@ from airflow import DAG
 from airflow.providers.google.cloud.hooks.gcs import GCSHook
 from airflow.providers.http.operators.http import SimpleHttpOperator
 from airflow.utils.dates import days_ago
+import requests
 import csv
-import io
 import json
+import logging
+import os
+import requests
 from google.cloud import storage
 from airflow.providers.google.cloud.transfers.gcs_to_bigquery import GCSToBigQueryOperator
 from google.cloud import storage
@@ -30,35 +33,43 @@ with DAG(
     DATASET_ID = "landing"
     TABLE_ID = "fatima_order_payments"
 
-    def upload_to_gcs(**kwargs):
-        # Get the API response from XCom
-        api_response = kwargs['ti'].xcom_pull(task_ids='fetch_api_data')
+    def upload_to_gcs(api_url, output_filename=None):
+        logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-        # Ensure the API response is a list of dictionaries
-        if isinstance(api_response, str):
-            try:
-                # Attempt to parse the string as JSON if it's a string
-                api_response = json.loads(api_response)
-            except json.JSONDecodeError:
-                raise ValueError("API response is a string but could not be parsed as JSON.")
-        
-        # Check that the response is a list of dictionaries
-        if not isinstance(api_response, list) or not all(isinstance(item, dict) for item in api_response):
-            raise ValueError("API response is not in the expected format (list of dictionaries).")
-        
-        # Convert the API response (list of dicts) to CSV
-        output = io.StringIO()
-        csv_writer = csv.DictWriter(output, fieldnames=api_response[0].keys())
-        csv_writer.writeheader()
-        csv_writer.writerows(api_response)
-        output.seek(0)
+        try:
+        logging.info(f"Fetching data from {api_url}")
+        response = requests.get(api_url, stream=True, timeout=10)
+        response.raise_for_status()
+
+        os.makedirs(os.path.dirname(output_filename), exist_ok=True)
+
+        if response.headers.get('Content-Type') == 'application/json':
+            data = response.json()
+            if isinstance(data, list):
+                if data and all(isinstance(item,dict) for item in data):
+                    with open(output_filename, 'w', newline='', encoding='utf-8') as csvfile:
+                        writer = csv.DictWriter(csvfile, fieldnames=data[0].keys())
+                        writer.writeheader()
+                        writer.writerows(data)
+                        
+            elif isinstance(data, dict):
+                with open(output_filename, 'w', newline='', encoding='utf-8') as csvfile:
+                    writer = csv.DictWriter(csvfile, fieldnames=data.keys())
+                    writer.writeheader()
+                    writer.writerow(data)
+
+        else:
+            with open(output_filename, 'w', newline='', encoding='utf-8') as csvfile:
+                writer = csv.writer(csvfile)
+                writer.writerows(csv.reader(response.iter_lines(decode_unicode=True), delimiter=','))
+
 
         # Upload the CSV file to GCS
         gcs_hook = GCSHook(gcp_conn_id='google_cloud_default')  # You can specify a different connection ID if needed
         gcs_hook.upload(
             bucket_name=GCS_BUCKET,
             object_name=GCS_FILE_PATH,
-            data=output.getvalue()
+            data=csvfile.getvalue()
         )
 
     # Task to fetch API data
