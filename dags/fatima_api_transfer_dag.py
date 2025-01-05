@@ -37,7 +37,7 @@ with DAG(
         logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
         try:
-        logging.info(f"Fetching data from {api_url}")
+            logging.info(f"Fetching data from {api_url}")
         response = requests.get(api_url, stream=True, timeout=10)
         response.raise_for_status()
 
