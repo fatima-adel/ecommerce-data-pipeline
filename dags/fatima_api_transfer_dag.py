@@ -22,7 +22,7 @@ with DAG(
     tags=["fatima", "api", "gcs", "csv", "upload"],
     ) as ftransfer_dag_api_to_bigquery:
     
-    API_URL = "https://us-central1-ready-de-25.cloudfunctions.net/order_payments_table"
+    API_URL = "/order_payments_table"
     GCS_BUCKET = "ready-d25-postgres-to-gcs"
     GCS_FILE_PATH = "fatima/order_payments.csv"
     PROJECT_ID = "ready-de-25"
