@@ -97,4 +97,4 @@ with DAG(
     )
 
     # Define task dependencies
-    fetch_api_data >> upload_csv_to_gcs >> api_load_to_bigquery
+fetch_api_data >> upload_csv_to_gcs >> api_load_to_bigquery
