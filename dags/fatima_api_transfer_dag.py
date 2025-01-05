@@ -20,7 +20,7 @@ with DAG(
     default_args=default_args,
     schedule=None,
     start_date=datetime(2024, 4, 20),
-    tags=["fatima", "api", "gcs", "csv", "upload"],
+    tags=["fatima", "api", "gcs", "upload"],
     ) as ftransfer_dag_api_to_bigquery:
     
     API_URL = "https://us-central1-ready-de-25.cloudfunctions.net/order_payments_table"
@@ -97,4 +97,4 @@ def upload_to_gcs(**kwargs):
     )
 
     # Define task dependencies
-fetch_api_data >> upload_csv_to_gcs >> api_load_to_bigquery
+    fetch_api_data >> upload_csv_to_gcs >> api_load_to_bigquery
