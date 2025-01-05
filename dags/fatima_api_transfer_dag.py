@@ -81,12 +81,12 @@ with DAG(
             )
 
         # Task to fetch API data
-        fetch_api_data = SimpleHttpOperator(
-            task_id='fetch_api_data',
-            http_conn_id='http_default',  # Connection ID for your HTTP API
-            endpoint=API_URL,
-            method='GET',
-            dag=ftransfer_dag_api_to_bigquery  # Ensure DAG is passed explicitly
+    fetch_api_data = SimpleHttpOperator(
+        task_id='fetch_api_data',
+        http_conn_id='http_default',  # Connection ID for your HTTP API
+        endpoint=API_URL,
+        method='GET',
+        dag=ftransfer_dag_api_to_bigquery  # Ensure DAG is passed explicitly
     )
 
     # Task to upload data to GCS
