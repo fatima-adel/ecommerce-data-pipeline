@@ -13,6 +13,7 @@ from airflow.providers.google.cloud.transfers.gcs_to_bigquery import GCSToBigQue
 from google.cloud import storage
 from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
+from csv import DictWriter, writer
 
 default_args = {
     "retries": 1
@@ -33,52 +34,51 @@ with DAG(
     DATASET_ID = "landing"
     TABLE_ID = "fatima_order_payments"
 
-    def upload_to_gcs(api_url, output_filename=None):
-        logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-        
-        logging.info(f"Fetching data from {api_url}")
+def upload_to_gcs(api_url, output_filename=None):
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+
+    logging.info(f"Fetching data from {api_url}")
+    try:
         response = requests.get(api_url, stream=True, timeout=10)
-        response.raise_for_status()  # Will raise an HTTPError for bad responses
+        response.raise_for_status()
 
-            # Create the directory if it doesn't exist
+        # Create directory if needed
         if output_filename:
-                os.makedirs(os.path.dirname(output_filename), exist_ok=True)
+            os.makedirs(os.path.dirname(output_filename), exist_ok=True)
 
-            # Process the data
+        # Process the data
         if response.headers.get('Content-Type') == 'application/json':
-                data = response.json()
-                # Check if the data is a list of dicts
-                if isinstance(data, list):
-                    if data and all(isinstance(item, dict) for item in data):
-                        # Writing CSV to memory
-                        output = io.StringIO()
-                        writer = csv.DictWriter(output, fieldnames=data[0].keys())
-                        writer.writeheader()
-                        writer.writerows(data)
-                        csv_data = output.getvalue()
-                # If data is a dict
-                elif isinstance(data, dict):
-                    output = io.StringIO()
-                    writer = csv.DictWriter(output, fieldnames=data.keys())
-                    writer.writeheader()
-                    writer.writerow(data)
-                    csv_data = output.getvalue()
-        else:
-                # Handling CSV content directly from response
+            data = response.json()
+            if isinstance(data, (list, dict)):
                 output = io.StringIO()
-                writer = csv.writer(output)
-                # Writing the lines from the response directly to the CSV
-                for line in response.iter_lines(decode_unicode=True):
-                    writer.writerow(line.split(','))
+                writer = DictWriter(output, fieldnames=data[0].keys() if isinstance(data, list) else data.keys())
+                writer.writeheader()
+                for item in data:
+                    writer.writerow(item)
                 csv_data = output.getvalue()
+            else:
+                logging.warning("Unexpected JSON format, skipping CSV conversion")
 
-            # Upload the CSV data to GCS
+        else:
+            # Handle CSV content directly from response (if applicable)
+            output = io.StringIO()
+            writer = writer(output)
+            for line in response.iter_lines(decode_unicode=True):
+                writer.writerow(line.split(','))
+            csv_data = output.getvalue()
+
+        # Upload data to GCS
         gcs_hook = GCSHook(gcp_conn_id='google_cloud_default')  # Specify a different connection ID if needed
         gcs_hook.upload(
-                bucket_name='GCS_BUCKET',  # Replace with your bucket name
-                object_name='GCS_FILE_PATH',    # Replace with the desired file path
-                data=csv_data
-            )
+            bucket_name='GCS_BUCKET',  # Replace with your bucket name
+            object_name='GCS_FILE_PATH',  # Replace with the desired file path
+            data=csv_data
+
+        logging.info(f"Data uploaded to GCS: {gcs_hook.upload}")
+
+    except Exception as e:
+        logging.error(f"Error during data processing or upload: {e}")
+        )
 
         # Task to fetch API data
     fetch_api_data = SimpleHttpOperator(
@@ -105,15 +105,8 @@ with DAG(
         source_format="CSV",
         write_disposition="WRITE_TRUNCATE",
         create_disposition="CREATE_IF_NEEDED",
-        # schema= [
-        #     SchemaField("order_id", "STRING", mode="REQUIRED"),
-        #     SchemaField("payment_sequential", "INTEGER"),
-        #     SchemaField("payment_type", "STRING"),
-        #     SchemaField("payment_installments", "INTEGER"),
-        #     SchemaField("payment_value", "FLOAT")
-        # ]
         dag=ftransfer_dag_api_to_bigquery  # Ensure DAG is passed explicitly
     )
 
     # Define task dependencies
-fetch_api_data >> upload_csv_to_gcs >> api_load_to_bigquery
+    fetch_api_data >> upload_csv_to_gcs >> api_load_to_bigquery
