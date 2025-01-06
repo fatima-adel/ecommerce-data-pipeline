@@ -31,10 +31,6 @@ with DAG(
 
     def upload_to_gcs(api_url, bucket, obj):
         
-        api_url=API_URL
-        bucket=GCS_BUCKET
-        obj="fatima/order_payments.csv"
-        
         if not (api_url and bucket and obj and re.match(r"^https?://", api_url)):
             print("Invalid input parameters.")  # Use print for basic debugging in Airflow
             return "error"
@@ -60,8 +56,14 @@ with DAG(
                         buf = io.StringIO()
                         w = csv.DictWriter(buf, fieldnames=f, quoting=csv.QUOTE_NONNUMERIC)
                         w.writeheader()
-                        w.writerows(data) if isinstance(data, list) else w.writerow(data)
-                        GCSHook().upload(bucket=GCS_BUCKET, obj=GCS_FILE_PATH, data=buf.getvalue(), mime_type='text/csv')
+                       # Write rows based on whether data is a list of dicts or a single dict
+                        if isinstance(data, list):
+                            w.writerows(data)
+                        else:
+                            w.writerow(data)
+                        # Get the CSV content
+                        content = buf.getvalue()
+                        GCSHook().upload(bucket, obj, content, mime_type='text/csv')
                         print(f"Uploaded to gs://{bucket}/{obj}")
                     else:
                         print("No fields found in JSON data, creating empty file.")
@@ -99,9 +101,9 @@ with DAG(
         task_id='upload_csv_to_gcs',
         python_callable=upload_to_gcs,
         op_kwargs={
-            "api_url": API_URL, # Pass the full API URL here
-            "bucket": GCS_BUCKET,
-            "obj": GCS_FILE_PATH,
+            "api_url": "https://us-central1-ready-de-25.cloudfunctions.net/order_payments_table", # Pass the full API URL here
+            "bucket": "ready-d25-postgres-to-gcs",
+            "obj": "fatima/order_payments.csv",
         },
         dag=ftransfer_dag_api_to_bigquery
     )
