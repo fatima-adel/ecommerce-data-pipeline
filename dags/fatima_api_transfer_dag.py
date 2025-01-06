@@ -13,6 +13,7 @@ from airflow.providers.google.cloud.transfers.gcs_to_bigquery import GCSToBigQue
 from google.cloud import storage
 from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
+from airflow.models import Variable
 
 default_args = {
     "retries": 1
@@ -26,14 +27,15 @@ with DAG(
     tags=["fatima", "api", "gcs", "upload"],
     ) as ftransfer_dag_api_to_bigquery:
     
-    API_URL = "/order_payments_table" #https://us-central1-ready-de-25.cloudfunctions.net
+    api_url = "https://us-central1-ready-de-25.cloudfunctions.net/order_payments_table" 
     GCS_BUCKET = "ready-d25-postgres-to-gcs"
     GCS_FILE_PATH = "fatima/order_payments.csv"
     PROJECT_ID = "ready-de-25"
     DATASET_ID = "landing"
     TABLE_ID = "fatima_order_payments"
 
-    def upload_to_gcs(api_url, output_filename=None):
+    def upload_to_gcs(output_filename=None):
+        api_url = Variable.get("API_URL")
         logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
         
         logging.info(f"Fetching data from {api_url}")
@@ -84,7 +86,7 @@ with DAG(
     fetch_api_data = SimpleHttpOperator(
         task_id='fetch_api_data',
         http_conn_id='http_default',  # Connection ID for your HTTP API
-        endpoint=API_URL,
+        endpoint="/order_payments_table",
         method='GET',
         dag=ftransfer_dag_api_to_bigquery  # Ensure DAG is passed explicitly
     )
@@ -93,6 +95,7 @@ with DAG(
     upload_csv_to_gcs = PythonOperator(
         task_id='upload_csv_to_gcs',
         python_callable=upload_to_gcs,
+        op_kwargs={'api_url': fetch_api_data.output},  # Pass fetched API URL
         provide_context=True,
         dag=ftransfer_dag_api_to_bigquery  # Ensure DAG is passed explicitly
     )
@@ -105,13 +108,6 @@ with DAG(
         source_format="CSV",
         write_disposition="WRITE_TRUNCATE",
         create_disposition="CREATE_IF_NEEDED",
-        # schema= [
-        #     SchemaField("order_id", "STRING", mode="REQUIRED"),
-        #     SchemaField("payment_sequential", "INTEGER"),
-        #     SchemaField("payment_type", "STRING"),
-        #     SchemaField("payment_installments", "INTEGER"),
-        #     SchemaField("payment_value", "FLOAT")
-        # ]
         dag=ftransfer_dag_api_to_bigquery  # Ensure DAG is passed explicitly
     )
 
