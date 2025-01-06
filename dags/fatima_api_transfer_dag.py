@@ -15,12 +15,14 @@ from airflow.providers.google.cloud.transfers.gcs_to_bigquery import GCSToBigQue
 
 with DAG(
     dag_id="ftransfer_dag_api_to_bigquery",
-    start_date=datetime(2024, 4, 20),
     schedule=None,
-    tags=["api", "fatima", "gcs",  "transfer"],
+    start_date=datetime(2024, 4, 20),
+    tags=["api","fatima", "gcs", "transfer"],
 ) as ftransfer_dag_api_to_bigquery:
 
-    api_url = "https://us-central1-ready-de-25.cloudfunctions.net/order_payments_table"
+    API_BASE_URL = "https://us-central1-ready-de-25.cloudfunctions.net" # Define the base URL
+    API_ENDPOINT = "/order_payments_table"  # Define the endpoint
+    API_URL = API_BASE_URL + API_ENDPOINT # Combine base and endpoint for full URL
     GCS_BUCKET = "ready-d25-postgres-to-gcs"
     GCS_FILE_PATH = "fatima/order_payments.csv"
     PROJECT_ID = "ready-de-25"
@@ -29,14 +31,23 @@ with DAG(
 
     def upload_to_gcs(api_url, bucket, obj):
         if not (api_url and bucket and obj and re.match(r"^https?://", api_url)):
+            print("Invalid input parameters.")  # Use print for basic debugging in Airflow
             return "error"
         try:
+            print(f"Fetching from: {api_url}") # Print the URL being fetched
             r = requests.get(api_url, stream=True, timeout=10)
             r.raise_for_status()
+            print(f"Response status code: {r.status_code}")
+
             if not r.text:
+                print("Empty response from API.")
                 GCSHook().upload(bucket, obj, "")
                 return "warning"
-            if "application/json" in r.headers.get('Content-Type', ''):
+
+            content_type = r.headers.get('Content-Type', '')
+            print(f"Content-Type: {content_type}")
+
+            if "application/json" in content_type:
                 data = r.json()
                 if isinstance(data, (list, dict)) and data:
                     f = data[0].keys() if isinstance(data, list) else data.keys()
@@ -46,24 +57,35 @@ with DAG(
                         w.writeheader()
                         w.writerows(data) if isinstance(data, list) else w.writerow(data)
                         GCSHook().upload(bucket, obj, buf.getvalue(), mime_type='text/csv')
+                        print(f"Uploaded to gs://{bucket}/{obj}")
                     else:
+                        print("No fields found in JSON data, creating empty file.")
                         GCSHook().upload(bucket,obj,"")
                         return "warning"
                 elif not data:
+                    print("JSON data is not a list or dict, creating empty file.")
                     GCSHook().upload(bucket, obj, "")
                     return "warning"
                 else:
                     return "error"
             else:
                 GCSHook().upload(bucket, obj, r.content.decode('utf-8',errors='replace'), mime_type='text/csv')
+                print(f"Uploaded to gs://{bucket}/{obj}")
             return "success"
-        except Exception:
+        except requests.exceptions.RequestException as e:
+            print(f"Request error: {e}")
+            return "error"
+        except json.JSONDecodeError as e:
+            print(f"JSON decode error: {e}. Response text: {r.text if 'r' in locals() else 'No response text'}")
+            return "error"
+        except Exception as e:
+            print(f"An unexpected error occurred: {e}")
             return "error"
 
     fetch_api_data = SimpleHttpOperator(
         task_id='fetch_api_data',
         http_conn_id='http_default',
-        endpoint="/order_payments_table",
+        endpoint=API_ENDPOINT, # Use the endpoint here
         method='GET',
         dag=ftransfer_dag_api_to_bigquery
     )
@@ -72,7 +94,7 @@ with DAG(
         task_id='upload_csv_to_gcs',
         python_callable=upload_to_gcs,
         op_kwargs={
-            "api_url": api_url,
+            "api_url": API_URL, # Pass the full API URL here
             "bucket": GCS_BUCKET,
             "obj": GCS_FILE_PATH,
         },
