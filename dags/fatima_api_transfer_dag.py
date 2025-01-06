@@ -38,7 +38,7 @@ with DAG(
             r = requests.get(api_url, stream=True, timeout=10)
             r.raise_for_status()
             print(f"Response status code: {r.status_code}")
-
+            
             if not r.text:
                 print("Empty response from API.")
                 GCSHook().upload(bucket, obj, "")
@@ -56,7 +56,7 @@ with DAG(
                         w = csv.DictWriter(buf, fieldnames=f, quoting=csv.QUOTE_NONNUMERIC)
                         w.writeheader()
                         w.writerows(data) if isinstance(data, list) else w.writerow(data)
-                        GCSHook().upload(bucket, obj, buf.getvalue(), mime_type='text/csv')
+                        GCSHook().upload(bucket=GCS_BUCKET, obj=GCS_FILE_PATH, data=buf.getvalue(), mime_type='text/csv')
                         print(f"Uploaded to gs://{bucket}/{obj}")
                     else:
                         print("No fields found in JSON data, creating empty file.")
