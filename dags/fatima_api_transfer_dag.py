@@ -15,9 +15,8 @@ from airflow.providers.google.cloud.transfers.gcs_to_bigquery import GCSToBigQue
 
 with DAG(
     dag_id="ftransfer_dag_api_to_bigquery",
+    start_date=datetime(2024, 4, 20),
     schedule=None,
-    start_date=datetime(2023, 10, 26),  # Use a past start date for testing
-    catchup=False,
     tags=["api", "fatima", "gcs",  "transfer"],
 ) as ftransfer_dag_api_to_bigquery:
 
