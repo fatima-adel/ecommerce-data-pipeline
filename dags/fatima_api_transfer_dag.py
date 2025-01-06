@@ -6,7 +6,6 @@ import csv
 import json
 import io
 import re
-import logging
 
 from airflow.models.dag import DAG
 from airflow.operators.python import PythonOperator
@@ -30,25 +29,15 @@ with DAG(
     TABLE_ID = "fatima_order_payments"
 
     def upload_to_gcs(api_url, bucket, obj):
-        logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
         if not (api_url and bucket and obj and re.match(r"^https?://", api_url)):
-            logging.error("Invalid input parameters.")
             return "error"
         try:
-            logging.info(f"Fetching from: {api_url}")
             r = requests.get(api_url, stream=True, timeout=10)
             r.raise_for_status()
-            logging.info(f"Response status code: {r.status_code}")
-
             if not r.text:
-                logging.warning("Empty response from API.")
                 GCSHook().upload(bucket, obj, "")
                 return "warning"
-
-            content_type = r.headers.get('Content-Type', '')
-            logging.info(f"Content-Type: {content_type}")
-
-            if "application/json" in content_type:
+            if "application/json" in r.headers.get('Content-Type', ''):
                 data = r.json()
                 if isinstance(data, (list, dict)) and data:
                     f = data[0].keys() if isinstance(data, list) else data.keys()
@@ -56,39 +45,20 @@ with DAG(
                         buf = io.StringIO()
                         w = csv.DictWriter(buf, fieldnames=f, quoting=csv.QUOTE_NONNUMERIC)
                         w.writeheader()
-                        if isinstance(data, list):
-                            w.writerows(data)
-                        else:
-                            w.writerow(data)
-                        csv_data = buf.getvalue()
+                        w.writerows(data) if isinstance(data, list) else w.writerow(data)
+                        GCSHook().upload(bucket, obj, buf.getvalue(), mime_type='text/csv')
                     else:
-                        logging.warning("No fields found in JSON data, creating empty file.")
-                        csv_data = ""
                         GCSHook().upload(bucket,obj,"")
                         return "warning"
-                else:
-                    logging.warning("JSON data is not a list or dict, creating empty file.")
-                    csv_data = ""
+                elif not data:
                     GCSHook().upload(bucket, obj, "")
                     return "warning"
-
+                else:
+                    return "error"
             else:
-                csv_data = r.content.decode('utf-8', errors='replace') # Decode with error handling
-                logging.info("Treating response as non-JSON (likely CSV).")
-
-
-            gcs_hook = GCSHook(gcp_conn_id='google_cloud_default')
-            gcs_hook.upload(bucket, obj, csv_data, mime_type='text/csv')
-            logging.info(f"Uploaded to gs://{bucket}/{obj}")
+                GCSHook().upload(bucket, obj, r.content.decode('utf-8',errors='replace'), mime_type='text/csv')
             return "success"
-        except requests.exceptions.RequestException as e:
-            logging.error(f"Request error: {e}")
-            return "error"
-        except json.JSONDecodeError as e:
-            logging.error(f"JSON decode error: {e}. Response text: {r.text if 'r' in locals() else 'No response text'}")
-            return "error"
-        except Exception as e:
-            logging.exception(f"An unexpected error occurred: {e}")
+        except Exception:
             return "error"
 
     fetch_api_data = SimpleHttpOperator(
