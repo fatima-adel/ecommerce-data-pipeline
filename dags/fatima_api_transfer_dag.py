@@ -30,6 +30,11 @@ with DAG(
     TABLE_ID = "fatima_order_payments"
 
     def upload_to_gcs(api_url, bucket, obj):
+        
+        api_url=API_URL
+        bucket=GCS_BUCKET
+        obj="fatima/order_payments.csv"
+        
         if not (api_url and bucket and obj and re.match(r"^https?://", api_url)):
             print("Invalid input parameters.")  # Use print for basic debugging in Airflow
             return "error"
