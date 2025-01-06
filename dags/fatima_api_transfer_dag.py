@@ -27,7 +27,7 @@ with DAG(
     tags=["fatima", "api", "gcs", "upload"],
     ) as ftransfer_dag_api_to_bigquery:
     
-    API_URL = "/order_payments_table" #https://us-central1-ready-de-25.cloudfunctions.net
+    api_url = "https://us-central1-ready-de-25.cloudfunctions.net/order_payments_table" 
     GCS_BUCKET = "ready-d25-postgres-to-gcs"
     GCS_FILE_PATH = "fatima/order_payments.csv"
     PROJECT_ID = "ready-de-25"
@@ -86,7 +86,7 @@ with DAG(
     fetch_api_data = SimpleHttpOperator(
         task_id='fetch_api_data',
         http_conn_id='http_default',  # Connection ID for your HTTP API
-        endpoint="",
+        endpoint="/order_payments_table",
         method='GET',
         dag=ftransfer_dag_api_to_bigquery  # Ensure DAG is passed explicitly
     )
