@@ -7,7 +7,7 @@ import json
 import io
 import re
 
-from airflow.models.dag import DAG
+from airflow.models.dag import DAG 
 from airflow.operators.python import PythonOperator
 from airflow.providers.google.cloud.hooks.gcs import GCSHook
 from airflow.providers.http.operators.http import SimpleHttpOperator
