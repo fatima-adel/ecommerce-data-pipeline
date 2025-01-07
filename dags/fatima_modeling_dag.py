@@ -43,10 +43,10 @@ with DAG(
             SELECT DISTINCT
                 oi.order_id,
                 p.product_id,
-                e.string_field_1 as product_category_name_english,
+                e.product_category_name_english,
                 CASE WHEN p.product_weight_g < 0 THEN 0 ELSE p.product_weight_g END AS product_weight_g
             FROM `{source_table}.fatima_products` p
-            LEFT JOIN `{source_table}.fatima_product_category_name_translation` e ON p.product_category_name = e.string_field_0
+            LEFT JOIN `{source_table}.fatima_product_category_name_translation` e ON p.product_category_name = e.product_category_name
             LEFT JOIN `{source_table}.fatima_order_items` oi ON p.product_id = oi.product_id
         """,
         "view_dim_order_items": f"""
