@@ -45,7 +45,9 @@ with DAG(
         create_view_task = BigQueryInsertJobOperator(
             task_id=f"create_{view_name}",
             configuration={
-                "query": sql_query,
-                "useLegacySql": False,  # Important for Standard SQL
+                "query": {
+                    "query": sql_query,
+                    "useLegacySql": False,  # Important for Standard SQL
+                }
             },
         )
