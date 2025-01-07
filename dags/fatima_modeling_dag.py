@@ -46,5 +46,6 @@ with DAG(
             task_id=f"create_{view_name}",
             configuration={
                 "query": sql_query,
+                "useLegacySql": False,  # Important for Standard SQL
             },
         )
