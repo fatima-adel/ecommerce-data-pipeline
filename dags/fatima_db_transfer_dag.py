@@ -60,7 +60,7 @@ with DAG(
             destination_project_dataset_table=f"ready-de-25.landing.fatima_{table_name}",  # Dynamic table name
             write_disposition="WRITE_TRUNCATE",
             create_disposition="CREATE_IF_NEEDED",
-            ignore_unknown_values=True,
+            skip_leading_rows=1,
         )
 
     postgres_to_gcs >> load_to_bq
