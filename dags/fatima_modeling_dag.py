@@ -12,7 +12,7 @@ with DAG(
     tags=["fatima","bigquery", "modeling", "transformation"],
 ) as fbigquery_modeling_transformation:
     
-    source_table = "`ready-de-25.landing`"
+    source_table = "ready-de-25.landing"
 
     transformations = {
         "view_fact_orders": f"""
@@ -60,7 +60,6 @@ with DAG(
             FROM `{source_table}.fatima_order_items`
         """,
     }
-
     for view_name, sql_query in transformations.items():
         create_view_task = BigQueryInsertJobOperator(
             task_id=f"create_{view_name}",

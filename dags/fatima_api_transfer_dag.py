@@ -60,7 +60,7 @@ with DAG(
                             else:
                                 w.writerow(data)
                             csv_data = buf.getvalue()
-                            GCSHook().upload(bucket, obj, csv_data, mime_type='text/csv')
+                            GCSHook().upload(bucket_name=bucket, object_name=obj, data=csv_data, mime_type='text/csv')
                             print(f"Uploaded to gs://{bucket}/{obj}")
                         else:
                             print("No fields found in JSON data, creating empty file.")
@@ -75,7 +75,7 @@ with DAG(
                         return "error"
                 else:
                     csv_data = r.content.decode('utf-8', errors='replace')
-                    GCSHook().upload(bucket, obj, csv_data, mime_type='text/csv')
+                    GCSHook().upload(bucket_name=bucket, object_name=obj, data=csv_data, mime_type='text/csv')
                     print(f"Uploaded to gs://{bucket}/{obj}")
                 return "success"
             except requests.exceptions.RequestException as e:
