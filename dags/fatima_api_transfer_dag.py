@@ -24,7 +24,7 @@ with DAG(
     API_ENDPOINT = "/order_payments_table"  # Define the endpoint
     API_URL = API_BASE_URL + API_ENDPOINT # Combine base and endpoint for full URL
     GCS_BUCKET = "ready-d25-postgres-to-gcs"
-    GCS_FILE_PATH = "fatima/order_payments.csv"
+    GCS_FILE_PATH = "fatima/fatima_order_payments.csv"
     PROJECT_ID = "ready-de-25"
     DATASET_ID = "landing"
     TABLE_ID = "fatima_order_payments"
@@ -63,7 +63,7 @@ with DAG(
                             w.writerow(data)
                         # Get the CSV content
                         content = buf.getvalue()
-                        GCSHook().upload(bucket, obj, content, mime_type='text/csv')
+                        GCSHook().upload(bucket, obj, filename="fatima_order_payments.csv", mime_type='text/csv')
                         print(f"Uploaded to gs://{bucket}/{obj}")
                     else:
                         print("No fields found in JSON data, creating empty file.")
@@ -76,7 +76,7 @@ with DAG(
                 else:
                     return "error"
             else:
-                GCSHook().upload(bucket, obj, r.content.decode('utf-8',errors='replace'), mime_type='text/csv')
+                GCSHook().upload(bucket, obj, r.content.decode('utf-8',errors='replace'),  filename="fatima_order_payments.csv", mime_type='text/csv')
                 print(f"Uploaded to gs://{bucket}/{obj}")
             return "success"
         except requests.exceptions.RequestException as e:
@@ -101,9 +101,9 @@ with DAG(
         task_id='upload_csv_to_gcs',
         python_callable=upload_to_gcs,
         op_kwargs={
-            "api_url": "https://us-central1-ready-de-25.cloudfunctions.net/order_payments_table", # Pass the full API URL here
-            "bucket": "ready-d25-postgres-to-gcs",
-            "obj": "fatima/order_payments.csv",
+            "api_url":  API_URL,
+            "bucket": GCS_BUCKET,
+            "obj": GCS_FILE_PATH,
         },
         dag=ftransfer_dag_api_to_bigquery
     )
