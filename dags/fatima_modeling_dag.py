@@ -53,7 +53,7 @@ with DAG(
             CREATE OR REPLACE VIEW `{source_table}.fview_dim_order_items` AS
             SELECT DISTINCT
                 order_id,
-                order_item,
+                order_item_id,
                 product_id,
                 seller_id,
                 price
