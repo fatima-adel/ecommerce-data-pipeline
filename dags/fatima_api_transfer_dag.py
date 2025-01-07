@@ -30,64 +30,63 @@ with DAG(
     TABLE_ID = "fatima_order_payments"
 
     def upload_to_gcs(api_url, bucket, obj):
-        
-        if not (api_url and bucket and obj and re.match(r"^https?://", api_url)):
-            print("Invalid input parameters.")  # Use print for basic debugging in Airflow
-            return "error"
-        try:
-            print(f"Fetching from: {api_url}") # Print the URL being fetched
-            r = requests.get(api_url, stream=True, timeout=10)
-            r.raise_for_status()
-            print(f"Response status code: {r.status_code}")
-            
-            if not r.text:
-                print("Empty response from API.")
-                GCSHook().upload(bucket, obj, "")
-                return "warning"
+            if not (api_url and bucket and obj and re.match(r"^https?://", api_url)):
+                print("Invalid input parameters.")
+                return "error"
+            try:
+                print(f"Fetching from: {api_url}")
+                r = requests.get(api_url, stream=True, timeout=10)
+                r.raise_for_status()
+                print(f"Response status code: {r.status_code}")
 
-            content_type = r.headers.get('Content-Type', '')
-            print(f"Content-Type: {content_type}")
-
-            if "application/json" in content_type:
-                data = r.json()
-                if isinstance(data, (list, dict)) and data:
-                    f = data[0].keys() if isinstance(data, list) else data.keys()
-                    if f:
-                        buf = io.StringIO()
-                        w = csv.DictWriter(buf, fieldnames=f, quoting=csv.QUOTE_NONNUMERIC)
-                        w.writeheader()
-                       # Write rows based on whether data is a list of dicts or a single dict
-                        if isinstance(data, list):
-                            w.writerows(data)
-                        else:
-                            w.writerow(data)
-                        # Get the CSV content
-                        content = buf.getvalue()
-                        GCSHook().upload(bucket, obj, filename=obj, mime_type='text/csv')
-                        print(f"Uploaded to gs://{bucket}/{obj}")
-                    else:
-                        print("No fields found in JSON data, creating empty file.")
-                        GCSHook().upload(bucket,obj,"")
-                        return "warning"
-                elif not data:
-                    print("JSON data is not a list or dict, creating empty file.")
+                if not r.text:
+                    print("Empty response from API.")
                     GCSHook().upload(bucket, obj, "")
                     return "warning"
+
+                content_type = r.headers.get('Content-Type', '')
+                print(f"Content-Type: {content_type}")
+
+                if "application/json" in content_type:
+                    data = r.json()
+                    if isinstance(data, (list, dict)) and data:
+                        f = data[0].keys() if isinstance(data, list) else data.keys()
+                        if f:
+                            buf = io.StringIO()
+                            w = csv.DictWriter(buf, fieldnames=f, quoting=csv.QUOTE_NONNUMERIC)
+                            w.writeheader()
+                            if isinstance(data, list):
+                                w.writerows(data)
+                            else:
+                                w.writerow(data)
+                            csv_data = buf.getvalue()
+                            GCSHook().upload(bucket, obj, csv_data, mime_type='text/csv')
+                            print(f"Uploaded to gs://{bucket}/{obj}")
+                        else:
+                            print("No fields found in JSON data, creating empty file.")
+                            GCSHook().upload(bucket,obj,"")
+                            return "warning"
+                    elif not data:
+                        print("JSON data is empty, creating empty file.")
+                        GCSHook().upload(bucket, obj, "")
+                        return "warning"
+                    else:
+                        print("JSON data is not a list or dict, returning error.")
+                        return "error"
                 else:
-                    return "error"
-            else:
-                GCSHook().upload(bucket, obj, r.content.decode('utf-8',errors='replace'), filename=obj, mime_type='text/csv')
-                print(f"Uploaded to gs://{bucket}/{obj}")
-            return "success"
-        except requests.exceptions.RequestException as e:
-            print(f"Request error: {e}")
-            return "error"
-        except json.JSONDecodeError as e:
-            print(f"JSON decode error: {e}. Response text: {r.text if 'r' in locals() else 'No response text'}")
-            return "error"
-        except Exception as e:
-            print(f"An unexpected error occurred: {e}")
-            return "error"
+                    csv_data = r.content.decode('utf-8', errors='replace')
+                    GCSHook().upload(bucket, obj, csv_data, mime_type='text/csv')
+                    print(f"Uploaded to gs://{bucket}/{obj}")
+                return "success"
+            except requests.exceptions.RequestException as e:
+                print(f"Request error: {e}")
+                return "error"
+            except json.JSONDecodeError as e:
+                print(f"JSON decode error: {e}. Response text: {r.text if 'r' in locals() else 'No response text'}")
+                return "error"
+            except Exception as e:
+                print(f"An unexpected error occurred: {e}")
+                return "error"
 
     fetch_api_data = SimpleHttpOperator(
         task_id='fetch_api_data',
