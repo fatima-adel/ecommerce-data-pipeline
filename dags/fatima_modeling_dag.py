@@ -27,7 +27,7 @@ with DAG(
                 CASE WHEN p.payment_value < 0 THEN 0 ELSE p.payment_value END AS payment_value,
                 r.review_score
             FROM `{source_table}.fatima_orders` o
-            LEFT JOIN `{source_table}.fatima_order_review` r ON o.order_id = r.order_id
+            LEFT JOIN `{source_table}.fatima_order_reviews` r ON o.order_id = r.order_id
             LEFT JOIN `{source_table}.fatima_order_payments` p ON o.order_id = p.order_id
         """,
         "view_dim_customer": f"""
@@ -43,10 +43,10 @@ with DAG(
             SELECT DISTINCT
                 oi.order_id,
                 p.product_id,
-                e.product_category_name_english,
+                e.string_field_1 as product_category_name_english,
                 CASE WHEN p.product_weight_g < 0 THEN 0 ELSE p.product_weight_g END AS product_weight_g
             FROM `{source_table}.fatima_products` p
-            LEFT JOIN `{source_table}.fatima_product_category_name_translation` e ON p.product_category_name = e.product_category_name
+            LEFT JOIN `{source_table}.fatima_product_category_name_translation` e ON p.product_category_name = e.string_field_0
             LEFT JOIN `{source_table}.fatima_order_items` oi ON p.product_id = oi.product_id
         """,
         "view_dim_order_items": f"""
