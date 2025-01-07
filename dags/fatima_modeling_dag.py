@@ -43,7 +43,7 @@ with DAG(
             SELECT DISTINCT
                 oi.order_id,
                 p.product_id,
-                e.product_category_name,
+                e.product_category_name_english,
                 CASE WHEN p.product_weight_g < 0 THEN 0 ELSE p.product_weight_g END AS product_weight_g
             FROM `{source_table}.fatima_products` p
             LEFT JOIN `{source_table}.fatima_product_category_name_translation` e ON p.product_category_name = e.product_category_name
@@ -53,7 +53,7 @@ with DAG(
             CREATE OR REPLACE VIEW `{source_table}.fview_dim_order_items` AS
             SELECT DISTINCT
                 order_id,
-                order_item,
+                order_item_id,
                 product_id,
                 seller_id,
                 price
