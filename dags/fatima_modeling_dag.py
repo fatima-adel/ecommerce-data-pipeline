@@ -3,7 +3,7 @@ from __future__ import annotations
 import pendulum
 
 from airflow.models.dag import DAG
-from airflow.providers.google.cloud.operators.bigquery import BigQueryExecuteQueryOperator
+from airflow.providers.google.cloud.operators.bigquery import BigQueryInsertJobOperator
 
 with DAG(
     dag_id="fbigquery_modeling_transformation",
@@ -42,7 +42,7 @@ with DAG(
 }
 
     for view_name, sql_query in transformations.items():
-        create_view_task = BigQueryExecuteQueryOperator(
+        create_view_task = BigQueryInsertJobOperator(
             task_id=f"create_{view_name}",
             sql=sql_query,
             use_legacy_sql=False,  # Use standard SQL
